@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <style>
+            html,body {
+                margin: 0;
+                padding: 0;
+                position: relative;
+            }
+
+            div#container {
+                height: 100%;
+                width: 100vw;
+                left: 0;
+                bottom: 0;
+                position: fixed;
+            }
+
+            canvas {
+                height: 100%;
+                width: 100%;
+            }
+        </style>
+        <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+
+        <script type="importmap">
+          {
+            "imports": {
+              "three": "https://unpkg.com/three@0.151.3/build/three.module.js",
+              "three/addons/": "https://unpkg.com/three@0.151.3/examples/jsm/"
+            }
+          }
+        </script>
+    </head>
+
+    <body>
+        <div id="container">
+            <canvas id="glCanvas"></canvas>
+        </div>
+
+        <script id="fragmentShader" type="x-shader/x-fragment">
+            precision mediump float;
+            precision mediump int;
+
+            #define PI 3.14159265359
+            #define TWO_PI 6.28318530718
+
+            uniform vec2 u_resolution;
+            uniform vec2 u_mouse;
+
+            void main(){
+                vec3 color = vec3(0.0);
+                float numCells = 25.0;
+
+                //normalizing current pixel
+                vec2 st = gl_FragCoord.xy/u_resolution.xy;
+                //makes squares instead of rectangles
+                st.x *= u_resolution.x/u_resolution.y;
+
+                float y_norm = 2.-u_mouse.y/u_resolution.y;
+                vec2 mouse = vec2(u_mouse.x/u_resolution.x, y_norm);
+                mouse.x *= u_resolution.x/u_resolution.y;
+
+                //tile the cells
+                st *= numCells;
+                vec2 i_st = floor(st);
+
+                //every other row indented a bit
+                st.x += step(1., mod(st.y,2.0)) * 0.5;
+
+                vec2 f_st = fract(st);
+            
+                //center of cells currently normalized to 0->1
+                vec2 cellCenter = vec2(0.5);
+                //convert center back to coordinates relative to mouse/st
+                vec2 center = (cellCenter + i_st) / vec2(numCells);
+
+                vec2 normal = normalize(mouse-center);
+                //rotation matrix based on unit vector direction between mouse and center of the cell
+                mat2 rotation = mat2(normal.x, normal.y, 
+                        -normal.y,  normal.x);
+
+                //translate, rotate, then translate back
+                f_st -= 0.5;
+                f_st = f_st * rotation;
+                f_st += 0.5;
+
+                //normalize cells from -1,1 for distance field
+                f_st = f_st * 2.0 - 1.;
+
+                //drawing triangles
+                int N = 3;
+                float d = 0.0;
+
+                // Angle and radius from the current pixel
+                float a = atan(f_st.x,f_st.y)+PI;
+                float r = TWO_PI/float(N);
+
+                // Shaping function that modulate the distance
+                d = cos(floor(.5+a/r)*r-a)*length(f_st);
+                color = vec3(1.0-smoothstep(.4,.41,d));
+
+                gl_FragColor = vec4(color,0.7);
+            }
+        </script>
+
+        <script type="module" src="./threejs_shaders.js">
+        </script>
+
+    </body>
+</html>
